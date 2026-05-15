@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SEASON_END, SEASON_START, STATUS_META, type Status } from "@/lib/band-config";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Row = { member_name: string; date: string; status: Status };
 
@@ -10,44 +12,46 @@ const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
+const WEEKDAY_LETTERS = ["D", "S", "T", "Q", "Q", "S", "S"]; // Sun..Sat
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const STATUSES: Status[] = ["S", "N", "C"];
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
 
-export function StatsPanel() {
+function inSeason(d: Date) {
+  return d >= SEASON_START && d <= SEASON_END;
+}
+
+export function MonthDashboard() {
+  const [cursor, setCursor] = useState<Date>(startOfMonth(SEASON_START));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    (async () => {
+    const load = async () => {
       const { data, error } = await supabase
         .from("availability")
         .select("member_name, date, status")
         .gte("date", ymd(SEASON_START))
         .lte("date", ymd(SEASON_END));
       if (!active) return;
-      if (error) toast.error("Erro a carregar estatísticas");
+      if (error) toast.error("Erro a carregar dashboard");
       else setRows((data ?? []) as Row[]);
       setLoading(false);
-    })();
+    };
+    load();
 
     const channel = supabase
-      .channel("availability-stats")
+      .channel("availability-dashboard")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "availability" },
-        async () => {
-          const { data } = await supabase
-            .from("availability")
-            .select("member_name, date, status")
-            .gte("date", ymd(SEASON_START))
-            .lte("date", ymd(SEASON_END));
-          if (data) setRows(data as Row[]);
-        },
+        () => load(),
       )
       .subscribe();
 
@@ -57,160 +61,220 @@ export function StatsPanel() {
     };
   }, []);
 
-  const months = useMemo(() => {
-    const arr: { key: string; label: string }[] = [];
-    const cur = new Date(SEASON_START.getFullYear(), SEASON_START.getMonth(), 1);
-    const end = new Date(SEASON_END.getFullYear(), SEASON_END.getMonth(), 1);
-    while (cur <= end) {
-      arr.push({
-        key: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
-        label: MONTHS_PT[cur.getMonth()],
-      });
-      cur.setMonth(cur.getMonth() + 1);
-    }
-    return arr;
-  }, []);
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const monthRows = useMemo(
+    () => rows.filter((r) => r.date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`)),
+    [rows, year, month],
+  );
 
   const members = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.member_name))).sort((a, b) => a.localeCompare(b, "pt")),
+    () =>
+      Array.from(new Set(rows.map((r) => r.member_name))).sort((a, b) =>
+        a.localeCompare(b, "pt"),
+      ),
     [rows],
   );
 
-  // member -> status -> count
-  const memberTotals = useMemo(() => {
-    const m = new Map<string, Record<Status, number>>();
-    for (const r of rows) {
-      const cur = m.get(r.member_name) ?? { S: 0, N: 0, C: 0 };
-      cur[r.status]++;
+  // member -> day -> status
+  const grid = useMemo(() => {
+    const m = new Map<string, Map<number, Status>>();
+    for (const r of monthRows) {
+      const day = parseInt(r.date.slice(8, 10), 10);
+      const cur = m.get(r.member_name) ?? new Map<number, Status>();
+      cur.set(day, r.status);
       m.set(r.member_name, cur);
     }
     return m;
-  }, [rows]);
+  }, [monthRows]);
 
-  // monthKey -> status -> count
-  const monthTotals = useMemo(() => {
-    const m = new Map<string, Record<Status, number>>();
-    for (const r of rows) {
-      const key = r.date.slice(0, 7);
-      const cur = m.get(key) ?? { S: 0, N: 0, C: 0 };
+  // Per-day totals
+  const dayTotals = useMemo(() => {
+    const t = new Map<number, Record<Status, number>>();
+    for (const r of monthRows) {
+      const day = parseInt(r.date.slice(8, 10), 10);
+      const cur = t.get(day) ?? { S: 0, N: 0, C: 0 };
       cur[r.status]++;
-      m.set(key, cur);
+      t.set(day, cur);
     }
-    return m;
-  }, [rows]);
+    return t;
+  }, [monthRows]);
 
-  const maxMonth = useMemo(() => {
-    let max = 0;
-    for (const v of monthTotals.values()) {
-      max = Math.max(max, v.S, v.N, v.C);
+  // Per-member totals (current month)
+  const memberTotals = useMemo(() => {
+    const t = new Map<string, Record<Status, number>>();
+    for (const r of monthRows) {
+      const cur = t.get(r.member_name) ?? { S: 0, N: 0, C: 0 };
+      cur[r.status]++;
+      t.set(r.member_name, cur);
     }
-    return Math.max(max, 1);
-  }, [monthTotals]);
+    return t;
+  }, [monthRows]);
 
-  if (loading) {
-    return <p className="text-center text-sm text-muted-foreground">A carregar estatísticas…</p>;
-  }
-
-  if (rows.length === 0) {
-    return (
-      <p className="text-center text-sm text-muted-foreground">
-        Ainda não há marcações para mostrar.
-      </p>
-    );
-  }
+  const canPrev = startOfMonth(cursor) > startOfMonth(SEASON_START);
+  const canNext = startOfMonth(cursor) < startOfMonth(SEASON_END);
 
   return (
-    <div className="space-y-8">
-      {/* Per member */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Por membro</h3>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCursor(new Date(year, month - 1, 1))}
+          disabled={!canPrev}
+          aria-label="Mês anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h3 className="text-lg font-semibold capitalize">
+          {MONTHS_PT[month]} {year}
+        </h3>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCursor(new Date(year, month + 1, 1))}
+          disabled={!canNext}
+          aria-label="Mês seguinte"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {loading ? (
+        <p className="text-center text-sm text-muted-foreground">A carregar…</p>
+      ) : members.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground">
+          Ainda não há marcações.
+        </p>
+      ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
+          <table className="w-full border-collapse text-xs">
             <thead>
-              <tr className="border-b border-border bg-muted/30 text-left">
-                <th className="px-3 py-2 font-medium text-muted-foreground">Membro</th>
-                {STATUSES.map((s) => (
-                  <th key={s} className="px-3 py-2 text-center font-medium text-muted-foreground">
-                    <span
-                      className="inline-flex items-center gap-1.5"
-                      title={STATUS_META[s].label}
+              <tr className="bg-muted/40">
+                <th className="sticky left-0 z-10 border-b border-r border-border bg-muted/40 px-3 py-2 text-left font-medium text-muted-foreground">
+                  Membro
+                </th>
+                {days.map((d) => {
+                  const date = new Date(year, month, d);
+                  const wk = WEEKDAY_LETTERS[date.getDay()];
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                  return (
+                    <th
+                      key={d}
+                      className={cn(
+                        "border-b border-border px-1 py-1 text-center font-medium",
+                        isWeekend ? "bg-muted/60 text-foreground" : "text-muted-foreground",
+                      )}
                     >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: STATUS_META[s].color }}
-                      />
-                      {s}
-                    </span>
-                  </th>
-                ))}
-                <th className="px-3 py-2 text-center font-medium text-muted-foreground">Total</th>
+                      <div className="text-[10px] leading-none">{wk}</div>
+                      <div className="text-xs leading-tight tabular-nums">{d}</div>
+                    </th>
+                  );
+                })}
+                <th className="border-b border-l border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
+                  S
+                </th>
+                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
+                  N
+                </th>
+                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
+                  C
+                </th>
               </tr>
             </thead>
             <tbody>
               {members.map((name) => {
-                const t = memberTotals.get(name) ?? { S: 0, N: 0, C: 0 };
-                const total = t.S + t.N + t.C;
+                const memberDays = grid.get(name);
+                const totals = memberTotals.get(name) ?? { S: 0, N: 0, C: 0 };
                 return (
                   <tr key={name} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 font-medium text-foreground">{name}</td>
-                    {STATUSES.map((s) => (
-                      <td key={s} className="px-3 py-2 text-center tabular-nums">
-                        {t[s]}
-                      </td>
-                    ))}
-                    <td className="px-3 py-2 text-center font-semibold tabular-nums">{total}</td>
+                    <td className="sticky left-0 z-10 border-r border-border bg-card px-3 py-1.5 font-medium text-foreground whitespace-nowrap">
+                      {name}
+                    </td>
+                    {days.map((d) => {
+                      const date = new Date(year, month, d);
+                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                      const inside = inSeason(date);
+                      const status = memberDays?.get(d);
+                      return (
+                        <td
+                          key={d}
+                          className={cn(
+                            "border-l border-border p-0.5 text-center",
+                            !inside && "bg-muted/20",
+                            isWeekend && inside && !status && "bg-muted/30",
+                          )}
+                        >
+                          {status ? (
+                            <span
+                              className="inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold"
+                              style={{
+                                backgroundColor: STATUS_META[status].color,
+                                color: "var(--background)",
+                              }}
+                              title={`${name} — ${date.getDate()}: ${STATUS_META[status].label}`}
+                            >
+                              {status}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/40">·</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
+                      {totals.S}
+                    </td>
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
+                      {totals.N}
+                    </td>
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
+                      {totals.C}
+                    </td>
                   </tr>
                 );
               })}
+
+              {/* Totals per day */}
+              {(["S", "N", "C"] as Status[]).map((s) => (
+                <tr key={s} className="border-t border-border bg-muted/20">
+                  <td className="sticky left-0 z-10 border-r border-border bg-muted/40 px-3 py-1.5 text-left font-semibold">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: STATUS_META[s].color }}
+                      />
+                      Total {s}
+                    </span>
+                  </td>
+                  {days.map((d) => {
+                    const count = dayTotals.get(d)?.[s] ?? 0;
+                    return (
+                      <td
+                        key={d}
+                        className="border-l border-border px-1 py-1 text-center text-xs font-semibold tabular-nums"
+                        style={
+                          count > 0
+                            ? {
+                                color: STATUS_META[s].color,
+                              }
+                            : { color: "var(--muted-foreground)" }
+                        }
+                      >
+                        {count || ""}
+                      </td>
+                    );
+                  })}
+                  <td colSpan={3} className="border-l border-border bg-muted/40" />
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </section>
-
-      {/* Per month */}
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Por mês</h3>
-        <div className="space-y-4">
-          {months.map((m) => {
-            const t = monthTotals.get(m.key) ?? { S: 0, N: 0, C: 0 };
-            return (
-              <div key={m.key} className="space-y-2">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium capitalize text-foreground">
-                    {m.label}
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {t.S + t.N + t.C} marcações
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  {STATUSES.map((s) => {
-                    const pct = (t[s] / maxMonth) * 100;
-                    return (
-                      <div key={s} className="flex items-center gap-2">
-                        <span className="w-4 text-xs font-bold text-muted-foreground">{s}</span>
-                        <div className="relative h-5 flex-1 overflow-hidden rounded bg-muted/40">
-                          <div
-                            className={cn("h-full rounded transition-all")}
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: STATUS_META[s].color,
-                              minWidth: t[s] > 0 ? "4px" : 0,
-                            }}
-                          />
-                        </div>
-                        <span className="w-8 text-right text-xs tabular-nums text-foreground">
-                          {t[s]}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      )}
     </div>
   );
 }
