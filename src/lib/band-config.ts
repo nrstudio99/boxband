@@ -1,17 +1,17 @@
 export const BAND_MEMBERS = [
-  "Sertório Calado",
+  "Telmo Lopes",
+  "Nuno Duarte",
   "Nuno Oliveira",
   "Paulo Rosa",
+  "Sertório",
   "Paulo Carvalho",
   "Micael Pereira",
   "Pedro Jesus",
   "Eduardo Azevedo",
   "João Gomes",
-  "Pedro Cartaxo",
   "Paulo Ramos",
+  "Pedro Cartaxo",
   "TC",
-  "Nuno Duarte",
-  "Telmo Lopes",
 ] as const;
 
 export const SITE_PASSWORD = "ensaios2026";
