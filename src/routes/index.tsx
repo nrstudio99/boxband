@@ -3,6 +3,7 @@ import { PasswordGate } from "@/components/PasswordGate";
 import { MemberGate, useMemberName } from "@/components/MemberGate";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { Legend } from "@/components/DayDetails";
+import { StatsPanel } from "@/components/StatsPanel";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LogOut, Music2 } from "lucide-react";
