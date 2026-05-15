@@ -10,3 +10,17 @@ export const STATUS_META = {
 
 export type Status = keyof typeof STATUS_META;
 export const STATUS_CYCLE: (Status | null)[] = ["S", "N", "C", null];
+
+export const BAND_MEMBERS = [
+  "Sertório Calado",
+  "Nuno Oliveira",
+  "Paulo Rosa",
+  "Paulo Carvalho",
+  "Micael Pereira",
+  "Pedro Jesus",
+  "Eduardo Azevedo",
+  "João",
+  "Pedro Cartaxo",
+  "Paulo Ramos",
+  "TC",
+] as const;
