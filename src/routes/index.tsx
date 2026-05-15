@@ -3,7 +3,7 @@ import { PasswordGate } from "@/components/PasswordGate";
 import { MemberGate, useMemberName } from "@/components/MemberGate";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { Legend } from "@/components/DayDetails";
-import { StatsPanel } from "@/components/StatsPanel";
+import { MonthDashboard } from "@/components/StatsPanel";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { LogOut, Music2 } from "lucide-react";
@@ -57,8 +57,8 @@ function Inner() {
           <AvailabilityCalendar memberName={name} />
         </div>
         <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Resumo</h2>
-          <StatsPanel />
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Dashboard mensal</h2>
+          <MonthDashboard />
         </div>
       </main>
     </div>
