@@ -28,9 +28,13 @@ function Inner() {
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-2 text-primary">
-              <Music2 className="h-5 w-5" />
-            </div>
+            <img
+              src={logo}
+              alt="Box Band & The Funk Project"
+              className="h-10 w-10 rounded-full object-cover"
+              width={40}
+              height={40}
+            />
             <div>
               <h1 className="text-lg font-semibold leading-tight text-foreground">
                 Box Band & The Funk Project
