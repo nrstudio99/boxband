@@ -1,3 +1,19 @@
+export const BAND_MEMBERS = [
+  "Sertório Calado",
+  "Nuno Oliveira",
+  "Paulo Rosa",
+  "Paulo Carvalho",
+  "Micael Pereira",
+  "Pedro Jesus",
+  "Eduardo Azevedo",
+  "João Gomes",
+  "Pedro Cartaxo",
+  "Paulo Ramos",
+  "TC",
+  "Nuno Duarte",
+  "Telmo Lopes",
+] as const;
+
 export const SITE_PASSWORD = "ensaios2026";
 export const SEASON_START = new Date(2026, 5, 1); // 1 Junho 2026
 export const SEASON_END = new Date(2026, 8, 13); // 13 Setembro 2026
