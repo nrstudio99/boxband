@@ -6,7 +6,8 @@ import { Legend } from "@/components/DayDetails";
 import { MonthDashboard } from "@/components/StatsPanel";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { LogOut, Music2 } from "lucide-react";
+import { LogOut } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
