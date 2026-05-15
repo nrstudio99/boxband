@@ -56,6 +56,10 @@ function Inner() {
         <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
           <AvailabilityCalendar memberName={name} />
         </div>
+        <div className="rounded-2xl border border-border bg-card/40 p-4 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Resumo</h2>
+          <StatsPanel />
+        </div>
       </main>
     </div>
   );
