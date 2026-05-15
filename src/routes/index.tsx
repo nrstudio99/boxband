@@ -11,7 +11,7 @@ import { LogOut, Music2 } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Ensaios da Banda" },
+      { title: "Box Band & The Funk Project" },
       { name: "description", content: "Marca a tua disponibilidade para os ensaios." },
     ],
   }),
@@ -32,7 +32,7 @@ function Inner() {
             </div>
             <div>
               <h1 className="text-lg font-semibold leading-tight text-foreground">
-                Ensaios da Banda
+                Box Band & The Funk Project
               </h1>
               <p className="text-xs text-muted-foreground">
                 1 Junho — 13 Setembro 2026
