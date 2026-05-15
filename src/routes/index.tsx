@@ -31,18 +31,14 @@ function Inner() {
             <img
               src={logo}
               alt="Box Band & The Funk Project"
-              className="h-10 w-10 rounded-full object-cover"
-              width={40}
-              height={40}
+              className="h-14 w-auto sm:h-16"
             />
-            <div>
-              <h1 className="text-lg font-semibold leading-tight text-foreground">
-                Box Band & The Funk Project
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                1 Junho — 13 Setembro 2026
-              </p>
-            </div>
+            <span className="sr-only">
+              <h1>Box Band & The Funk Project</h1>
+            </span>
+            <p className="hidden text-xs text-muted-foreground sm:block">
+              1 Junho — 13 Setembro 2026
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">
