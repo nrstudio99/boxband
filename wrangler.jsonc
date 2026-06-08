@@ -1,7 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tanstack-start-app",
+  "name": "boxband-ensaios",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "d1_databases": [
+    {
+      "binding": "ENSAIOS_DB",
+      "database_name": "ensaios-db",
+      "database_id": "0d30b851-8ccb-4595-ab24-5c88713fe518"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "agenda.boxband.eu",
+      "custom_domain": true
+    }
+  ]
 }
