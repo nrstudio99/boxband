@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   SEASON_END,
   SEASON_START,
@@ -40,56 +39,32 @@ function inSeason(d: Date) {
   return d >= SEASON_START && d <= SEASON_END;
 }
 
+const FROM = ymd(SEASON_START);
+const TO = ymd(SEASON_END);
+
 export function AvailabilityCalendar({ memberName }: { memberName: string }) {
   const [cursor, setCursor] = useState<Date>(startOfMonth(SEASON_START));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      const { data, error } = await supabase
-        .from("availability")
-        .select("id, member_name, date, status")
-        .gte("date", ymd(SEASON_START))
-        .lte("date", ymd(SEASON_END))
-        .order("date");
-      if (!active) return;
-      if (error) {
-        toast.error("Erro a carregar disponibilidades");
-      } else {
-        setRows((data ?? []) as Row[]);
-      }
+  const fetchRows = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/availability?from=${FROM}&to=${TO}`);
+      if (!res.ok) throw new Error("Erro de rede");
+      const data = await res.json() as Row[];
+      setRows(data);
+    } catch {
+      toast.error("Erro a carregar disponibilidades");
+    } finally {
       setLoading(false);
-    })();
-
-    const channel = supabase
-      .channel("availability-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "availability" },
-        (payload) => {
-          setRows((prev) => {
-            if (payload.eventType === "DELETE") {
-              const old = payload.old as Row;
-              return prev.filter((r) => r.id !== old.id);
-            }
-            const next = payload.new as Row;
-            const idx = prev.findIndex((r) => r.id === next.id);
-            if (idx === -1) return [...prev, next];
-            const copy = [...prev];
-            copy[idx] = next;
-            return copy;
-          });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
+    }
   }, []);
+
+  useEffect(() => {
+    fetchRows();
+    const interval = setInterval(fetchRows, 15_000);
+    return () => clearInterval(interval);
+  }, [fetchRows]);
 
   const byDate = useMemo(() => {
     const map = new Map<string, Row[]>();
@@ -105,51 +80,52 @@ export function AvailabilityCalendar({ memberName }: { memberName: string }) {
     if (!inSeason(date)) return;
     const dateStr = ymd(date);
     const existing = rows.find(
-      (r) => r.member_name === memberName && r.date === dateStr,
+      (r) => r.member_name === memberName && r.date === dateStr
     );
     const currentIdx = STATUS_CYCLE.indexOf(existing?.status ?? null);
     const next = STATUS_CYCLE[(currentIdx + 1) % STATUS_CYCLE.length];
 
     if (next === null) {
       if (!existing) return;
-      const prev = rows;
       setRows((p) => p.filter((r) => r.id !== existing.id));
-      const { error } = await supabase
-        .from("availability")
-        .delete()
-        .eq("id", existing.id);
-      if (error) {
-        setRows(prev);
+      const res = await fetch("/api/availability", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: existing.id }),
+      });
+      if (!res.ok) {
+        await fetchRows();
         toast.error("Erro a remover");
       }
       return;
     }
 
     if (existing) {
-      const prev = rows;
       setRows((p) =>
-        p.map((r) => (r.id === existing.id ? { ...r, status: next } : r)),
+        p.map((r) => (r.id === existing.id ? { ...r, status: next } : r))
       );
-      const { error } = await supabase
-        .from("availability")
-        .update({ status: next, updated_at: new Date().toISOString() })
-        .eq("id", existing.id);
-      if (error) {
-        setRows(prev);
+      const res = await fetch("/api/availability", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: existing.id, status: next }),
+      });
+      if (!res.ok) {
+        await fetchRows();
         toast.error("Erro a guardar");
       }
     } else {
-      const { data, error } = await supabase
-        .from("availability")
-        .insert({ member_name: memberName, date: dateStr, status: next })
-        .select()
-        .single();
-      if (error) {
+      const res = await fetch("/api/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_name: memberName, date: dateStr, status: next }),
+      });
+      if (!res.ok) {
         toast.error("Erro a guardar");
-      } else if (data) {
+      } else {
+        const data = await res.json() as Row;
         setRows((p) => {
           if (p.some((r) => r.id === data.id)) return p;
-          return [...p, data as Row];
+          return [...p, data];
         });
       }
     }
@@ -224,7 +200,7 @@ export function AvailabilityCalendar({ memberName }: { memberName: string }) {
                 "group relative flex aspect-square flex-col rounded-lg border p-1.5 text-left transition-all",
                 inside
                   ? "border-border bg-card hover:border-primary/50 hover:shadow-md"
-                  : "border-transparent bg-muted/30 cursor-not-allowed opacity-40",
+                  : "border-transparent bg-muted/30 cursor-not-allowed opacity-40"
               )}
               style={
                 mine

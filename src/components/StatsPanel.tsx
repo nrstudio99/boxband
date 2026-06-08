@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { SEASON_END, SEASON_START, STATUS_META, type Status } from "@/lib/band-config";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -26,40 +25,32 @@ function inSeason(d: Date) {
   return d >= SEASON_START && d <= SEASON_END;
 }
 
+const FROM = ymd(SEASON_START);
+const TO = ymd(SEASON_END);
+
 export function MonthDashboard() {
   const [cursor, setCursor] = useState<Date>(startOfMonth(SEASON_START));
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("availability")
-        .select("member_name, date, status")
-        .gte("date", ymd(SEASON_START))
-        .lte("date", ymd(SEASON_END));
-      if (!active) return;
-      if (error) toast.error("Erro a carregar dashboard");
-      else setRows((data ?? []) as Row[]);
+  const fetchRows = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/availability?from=${FROM}&to=${TO}`);
+      if (!res.ok) throw new Error("Erro de rede");
+      const data = await res.json() as Row[];
+      setRows(data);
+    } catch {
+      toast.error("Erro a carregar dashboard");
+    } finally {
       setLoading(false);
-    };
-    load();
-
-    const channel = supabase
-      .channel("availability-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "availability" },
-        () => load(),
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      supabase.removeChannel(channel);
-    };
+    }
   }, []);
+
+  useEffect(() => {
+    fetchRows();
+    const interval = setInterval(fetchRows, 15_000);
+    return () => clearInterval(interval);
+  }, [fetchRows]);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -68,18 +59,17 @@ export function MonthDashboard() {
 
   const monthRows = useMemo(
     () => rows.filter((r) => r.date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`)),
-    [rows, year, month],
+    [rows, year, month]
   );
 
   const members = useMemo(
     () =>
       Array.from(new Set(rows.map((r) => r.member_name))).sort((a, b) =>
-        a.localeCompare(b, "pt"),
+        a.localeCompare(b, "pt")
       ),
-    [rows],
+    [rows]
   );
 
-  // member -> day -> status
   const grid = useMemo(() => {
     const m = new Map<string, Map<number, Status>>();
     for (const r of monthRows) {
@@ -91,7 +81,6 @@ export function MonthDashboard() {
     return m;
   }, [monthRows]);
 
-  // Per-day totals
   const dayTotals = useMemo(() => {
     const t = new Map<number, Record<Status, number>>();
     for (const r of monthRows) {
@@ -103,7 +92,6 @@ export function MonthDashboard() {
     return t;
   }, [monthRows]);
 
-  // Per-member totals (current month)
   const memberTotals = useMemo(() => {
     const t = new Map<string, Record<Status, number>>();
     for (const r of monthRows) {
@@ -166,7 +154,7 @@ export function MonthDashboard() {
                       key={d}
                       className={cn(
                         "border-b border-border px-1 py-1 text-center font-medium",
-                        isWeekend ? "bg-muted/60 text-foreground" : "text-muted-foreground",
+                        isWeekend ? "bg-muted/60 text-foreground" : "text-muted-foreground"
                       )}
                     >
                       <div className="text-[10px] leading-none">{wk}</div>
@@ -174,15 +162,9 @@ export function MonthDashboard() {
                     </th>
                   );
                 })}
-                <th className="border-b border-l border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
-                  S
-                </th>
-                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
-                  N
-                </th>
-                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">
-                  C
-                </th>
+                <th className="border-b border-l border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">S</th>
+                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">N</th>
+                <th className="border-b border-border bg-muted/40 px-2 py-2 text-center font-medium text-muted-foreground">C</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +187,7 @@ export function MonthDashboard() {
                           className={cn(
                             "border-l border-border p-0.5 text-center",
                             !inside && "bg-muted/20",
-                            isWeekend && inside && !status && "bg-muted/30",
+                            isWeekend && inside && !status && "bg-muted/30"
                           )}
                         >
                           {status ? (
@@ -225,28 +207,17 @@ export function MonthDashboard() {
                         </td>
                       );
                     })}
-                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
-                      {totals.S}
-                    </td>
-                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
-                      {totals.N}
-                    </td>
-                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">
-                      {totals.C}
-                    </td>
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">{totals.S}</td>
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">{totals.N}</td>
+                    <td className="border-l border-border bg-muted/20 px-2 py-1 text-center font-semibold tabular-nums">{totals.C}</td>
                   </tr>
                 );
               })}
-
-              {/* Totals per day */}
               {(["S", "N", "C"] as Status[]).map((s) => (
                 <tr key={s} className="border-t border-border bg-muted/20">
                   <td className="sticky left-0 z-10 border-r border-border bg-muted/40 px-3 py-1.5 text-left font-semibold">
                     <span className="inline-flex items-center gap-1.5">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: STATUS_META[s].color }}
-                      />
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_META[s].color }} />
                       Total {s}
                     </span>
                   </td>
@@ -256,13 +227,7 @@ export function MonthDashboard() {
                       <td
                         key={d}
                         className="border-l border-border px-1 py-1 text-center text-xs font-semibold tabular-nums"
-                        style={
-                          count > 0
-                            ? {
-                                color: STATUS_META[s].color,
-                              }
-                            : { color: "var(--muted-foreground)" }
-                        }
+                        style={count > 0 ? { color: STATUS_META[s].color } : { color: "var(--muted-foreground)" }}
                       >
                         {count || ""}
                       </td>
