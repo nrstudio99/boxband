@@ -14,7 +14,7 @@ export const BAND_MEMBERS = [
   "TC",
 ] as const;
 
-export const SITE_PASSWORD = "ensaios2026";
+export const SITE_PASSWORD = "0ct0puS";
 export const SEASON_START = new Date(2026, 5, 1); // 1 Junho 2026
 export const SEASON_END = new Date(2026, 8, 13); // 13 Setembro 2026
 
