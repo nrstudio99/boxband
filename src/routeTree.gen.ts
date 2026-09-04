@@ -9,13 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SiteSurveyRouteImport } from './routes/site-survey'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SiteSurveyIndexRouteImport } from './routes/site-survey.index'
+import { Route as SiteSurveyIdRouteImport } from './routes/site-survey.$id'
 import { Route as ApiAvailabilityRouteImport } from './routes/api/availability'
 
+const SiteSurveyRoute = SiteSurveyRouteImport.update({
+  id: '/site-survey',
+  path: '/site-survey',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SiteSurveyIndexRoute = SiteSurveyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SiteSurveyRoute,
+} as any)
+const SiteSurveyIdRoute = SiteSurveyIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SiteSurveyRoute,
 } as any)
 const ApiAvailabilityRoute = ApiAvailabilityRouteImport.update({
   id: '/api/availability',
@@ -25,38 +43,79 @@ const ApiAvailabilityRoute = ApiAvailabilityRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/site-survey': typeof SiteSurveyRouteWithChildren
   '/api/availability': typeof ApiAvailabilityRoute
+  '/site-survey/$id': typeof SiteSurveyIdRoute
+  '/site-survey/': typeof SiteSurveyIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/availability': typeof ApiAvailabilityRoute
+  '/site-survey/$id': typeof SiteSurveyIdRoute
+  '/site-survey': typeof SiteSurveyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/site-survey': typeof SiteSurveyRouteWithChildren
   '/api/availability': typeof ApiAvailabilityRoute
+  '/site-survey/$id': typeof SiteSurveyIdRoute
+  '/site-survey/': typeof SiteSurveyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/availability'
+  fullPaths:
+    | '/'
+    | '/site-survey'
+    | '/api/availability'
+    | '/site-survey/$id'
+    | '/site-survey/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/availability'
-  id: '__root__' | '/' | '/api/availability'
+  to: '/' | '/api/availability' | '/site-survey/$id' | '/site-survey'
+  id:
+    | '__root__'
+    | '/'
+    | '/site-survey'
+    | '/api/availability'
+    | '/site-survey/$id'
+    | '/site-survey/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SiteSurveyRoute: typeof SiteSurveyRouteWithChildren
   ApiAvailabilityRoute: typeof ApiAvailabilityRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/site-survey': {
+      id: '/site-survey'
+      path: '/site-survey'
+      fullPath: '/site-survey'
+      preLoaderRoute: typeof SiteSurveyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/site-survey/': {
+      id: '/site-survey/'
+      path: '/'
+      fullPath: '/site-survey/'
+      preLoaderRoute: typeof SiteSurveyIndexRouteImport
+      parentRoute: typeof SiteSurveyRoute
+    }
+    '/site-survey/$id': {
+      id: '/site-survey/$id'
+      path: '/$id'
+      fullPath: '/site-survey/$id'
+      preLoaderRoute: typeof SiteSurveyIdRouteImport
+      parentRoute: typeof SiteSurveyRoute
     }
     '/api/availability': {
       id: '/api/availability'
@@ -68,8 +127,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SiteSurveyRouteChildren {
+  SiteSurveyIdRoute: typeof SiteSurveyIdRoute
+  SiteSurveyIndexRoute: typeof SiteSurveyIndexRoute
+}
+
+const SiteSurveyRouteChildren: SiteSurveyRouteChildren = {
+  SiteSurveyIdRoute: SiteSurveyIdRoute,
+  SiteSurveyIndexRoute: SiteSurveyIndexRoute,
+}
+
+const SiteSurveyRouteWithChildren = SiteSurveyRoute._addFileChildren(
+  SiteSurveyRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SiteSurveyRoute: SiteSurveyRouteWithChildren,
   ApiAvailabilityRoute: ApiAvailabilityRoute,
 }
 export const routeTree = rootRouteImport
